@@ -1,46 +1,76 @@
 import { createRouter, createWebHistory } from 'vue-router';
-
-const routes = [
-  {
-    path: '/',
-    name: 'Home',
-    redirect: '/products', // 默认重定向到商品管理页面
-  },
-  {
-    path: '/products',
-    name: 'ProductManagement',
-    component: () => import('../views/ProductManagement.vue'), // 稍后创建
-    meta: { title: '商品管理' },
-  },
-  {
-    path: '/customers',
-    name: 'CustomerManagement',
-    component: () => import('../views/CustomerManagement.vue'), // 稍后创建
-    meta: { title: '用户管理' },
-  },
-  {
-    path: '/orders',
-    name: 'OrderManagement',
-    component: () => import('../views/OrderManagement.vue'), // 稍后创建
-    meta: { title: '订单管理' },
-  },
-  {
-    path: '/deliveries',
-    name: 'DeliveryManagement',
-    component: () => import('../views/DeliveryManagement.vue'), // 稍后创建
-    meta: { title: '配送管理' },
-  },
-  {
-    path: '/coupons',
-    name: 'CouponManagement',
-    component: () => import('../views/CouponManagement.vue'), // 稍后创建
-    meta: { title: '优惠券管理' },
-  },
-];
+import ProductManagement from '../views/ProductManagement.vue';
+import CustomerManagement from '../views/CustomerManagement.vue';
+import OrderManagement from '../views/OrderManagement.vue';
+import DeliveryManagement from '../views/DeliveryManagement.vue';
+import CouponManagement from '../views/CouponManagement.vue';
+import Analytics from '../views/Analytics.vue';
+import BlacklistManagement from '../views/BlacklistManagement.vue';
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes,
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    {
+      path: '/',
+      redirect: '/products'
+    },
+    {
+      path: '/products',
+      name: 'products',
+      component: ProductManagement,
+      meta: {
+        title: 'menu.products'
+      }
+    },
+    {
+      path: '/customers',
+      name: 'customers',
+      component: CustomerManagement,
+      meta: {
+        title: 'menu.customers'
+      }
+    },
+    {
+      path: '/orders',
+      name: 'orders',
+      component: OrderManagement,
+      meta: {
+        title: 'menu.orders'
+      }
+    },
+    {
+      path: '/deliveries',
+      name: 'deliveries',
+      component: DeliveryManagement,
+      meta: {
+        title: 'menu.deliveries'
+      }
+    },
+    {
+      path: '/coupons',
+      name: 'coupons',
+      component: CouponManagement,
+      meta: {
+        title: 'menu.coupons'
+      }
+    },
+    {
+      path: '/analytics',
+      name: 'analytics',
+      component: Analytics,
+      meta: {
+        title: 'menu.analytics'
+      }
+    },
+    {
+      path: '/blacklist',
+      name: 'blacklist',
+      component: BlacklistManagement,
+      meta: {
+        title: 'menu.blacklist'
+      }
+    }
+  ]
 });
 
 export default router; 
