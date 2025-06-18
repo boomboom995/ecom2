@@ -1,22 +1,30 @@
 <template>
   <div class="order-management-page">
-    <h1>订单管理</h1>
-
     <el-card class="box-card">
+      <template #header>
+        <div class="card-header">
+          <h2>订单管理</h2>
+        </div>
+      </template>
+
       <div class="search-area">
         <el-input
           v-model="searchQuery.customerId"
           placeholder="输入客户ID搜索"
           clearable
-          style="width: 200px; margin-right: 10px;"
+          style="width: 200px;"
           @clear="fetchOrders"
           @keyup.enter="fetchOrders"
-        ></el-input>
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         <el-select
           v-model="searchQuery.orderStatus"
           placeholder="选择订单状态"
           clearable
-          style="width: 150px; margin-right: 10px;"
+          style="width: 150px;"
           @clear="fetchOrders"
         >
           <el-option label="已支付" value="已支付"></el-option>
@@ -24,35 +32,44 @@
           <el-option label="已取消" value="已取消"></el-option>
           <el-option label="已完成" value="已完成"></el-option>
         </el-select>
-        <el-button type="primary" @click="fetchOrders">搜索</el-button>
-        <el-button type="success" @click="handleAdd">新增订单</el-button>
+        <el-button type="primary" @click="fetchOrders" :icon="Search">搜索</el-button>
+        <el-button type="success" @click="handleAdd" :icon="Plus">新增订单</el-button>
       </div>
 
       <el-table
         :data="orders"
         v-loading="loading"
-        style="width: 100%; margin-top: 20px;"
+        style="width: 100%;"
         border
+        stripe
       >
         <el-table-column prop="orderId" label="订单ID" width="180"></el-table-column>
         <el-table-column prop="customerId" label="客户ID" width="180"></el-table-column>
         <el-table-column prop="productId" label="商品ID" width="180"></el-table-column>
-        <el-table-column prop="quantity" label="数量" width="80"></el-table-column>
-        <el-table-column prop="totalAmount" label="总金额" width="120"></el-table-column>
-        <el-table-column prop="orderStatus" label="订单状态" width="100"></el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column prop="quantity" label="数量" width="80" align="center"></el-table-column>
+        <el-table-column prop="totalAmount" label="总金额" width="120" align="right">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-popconfirm
-              title="确定删除此订单吗?"
-              confirm-button-text="确定"
-              cancel-button-text="取消"
-              @confirm="handleDelete(scope.row.orderId)"
-            >
-              <template #reference>
-                <el-button size="small" type="danger">删除</el-button>
-              </template>
-            </el-popconfirm>
+            <span style="color: #f56c6c; font-weight: bold;">
+              ¥{{ formatCurrency(scope.row.totalAmount) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="orderStatus" label="订单状态" width="120" align="center">
+          <template #default="scope">
+            <el-tag :type="getStatusType(scope.row.orderStatus)" size="small">
+              {{ scope.row.orderStatus }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180" align="center">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)" :icon="Edit">编辑</el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="handleDelete(scope.row.orderId)"
+              :icon="Delete"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -134,7 +151,8 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Search, Plus, Edit, Delete } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const orders = ref([]);
@@ -165,6 +183,22 @@ const rules = reactive({
   totalAmount: [{ required: true, message: '请输入总金额', trigger: 'blur' }],
   orderStatus: [{ required: true, message: '请选择订单状态', trigger: 'change' }],
 });
+
+// 格式化价格
+const formatCurrency = (amount) => {
+  return Number(amount).toFixed(2);
+};
+
+// 获取状态标签类型
+const getStatusType = (status) => {
+  const statusMap = {
+    '已支付': 'success',
+    '待支付': 'warning', 
+    '已取消': 'danger',
+    '已完成': 'info'
+  };
+  return statusMap[status] || '';
+};
 
 // 获取商品列表
 const fetchProducts = async () => {
@@ -232,9 +266,19 @@ const handleEdit = (row) => {
   dialogVisible.value = true;
 };
 
-// 删除订单
+// 删除订单 - 使用MessageBox确认
 const handleDelete = async (id) => {
   try {
+    await ElMessageBox.confirm(
+      '此操作将永久删除该订单，是否继续？',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
     await request({
       url: `/orders/${id}`,
       method: 'delete'
@@ -242,7 +286,11 @@ const handleDelete = async (id) => {
     ElMessage.success('订单删除成功！');
     fetchOrders(); // 刷新列表
   } catch (error) {
-    ElMessage.error('订单删除失败: ' + (error.message || '未知错误'));
+    if (error === 'cancel') {
+      ElMessage.info('已取消删除');
+    } else {
+      ElMessage.error('订单删除失败: ' + (error.message || '未知错误'));
+    }
   }
 };
 
@@ -319,10 +367,15 @@ onMounted(() => {
   padding: 20px;
 }
 
-.search-area {
+.card-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+}
+
+.card-header h2 {
+  margin: 0;
+  color: #303133;
 }
 
 .dialog-footer button:first-child {

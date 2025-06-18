@@ -1,44 +1,70 @@
 <template>
   <div class="customer-management-page">
-    <h1>用户管理</h1>
-
     <el-card class="box-card">
+      <template #header>
+        <div class="card-header">
+          <h2>用户管理</h2>
+        </div>
+      </template>
+
       <div class="search-area">
         <el-input
           v-model="searchQuery"
           placeholder="输入用户名称搜索"
           clearable
-          style="width: 300px; margin-right: 10px;"
+          style="width: 300px;"
           @clear="fetchCustomers"
           @keyup.enter="fetchCustomers"
-        ></el-input>
-        <el-button type="primary" @click="fetchCustomers">搜索</el-button>
-        <el-button type="success" @click="handleAdd">新增用户</el-button>
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" @click="fetchCustomers" :icon="Search">搜索</el-button>
+        <el-button type="success" @click="handleAdd" :icon="Plus">新增用户</el-button>
       </div>
 
       <el-table
         :data="customers"
         v-loading="loading"
-        style="width: 100%; margin-top: 20px;"
+        style="width: 100%;"
         border
+        stripe
       >
         <el-table-column prop="customerId" label="用户ID" width="180"></el-table-column>
-        <el-table-column prop="customerName" label="用户名称"></el-table-column>
-        <el-table-column prop="contactInfo" label="联系方式" width="180"></el-table-column>
-        <el-table-column prop="address" label="地址"></el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column prop="customerName" label="用户名称" width="200">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-popconfirm
-              title="确定删除此用户吗?"
-              confirm-button-text="确定"
-              cancel-button-text="取消"
-              @confirm="handleDelete(scope.row.customerId)"
-            >
-              <template #reference>
-                <el-button size="small" type="danger">删除</el-button>
-              </template>
-            </el-popconfirm>
+            <div style="display: flex; align-items: center;">
+              <el-icon style="margin-right: 8px; color: #409eff;"><User /></el-icon>
+              {{ scope.row.customerName }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="contactInfo" label="联系方式" width="180">
+          <template #default="scope">
+            <div style="display: flex; align-items: center;">
+              <el-icon style="margin-right: 8px; color: #67c23a;"><Phone /></el-icon>
+              {{ scope.row.contactInfo }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="address" label="地址" show-overflow-tooltip>
+          <template #default="scope">
+            <div style="display: flex; align-items: center;">
+              <el-icon style="margin-right: 8px; color: #e6a23c;"><Location /></el-icon>
+              {{ scope.row.address }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180" align="center">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)" :icon="Edit">编辑</el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="handleDelete(scope.row.customerId)"
+              :icon="Delete"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -63,16 +89,26 @@
         label-width="100px"
       >
         <el-form-item label="用户名称" prop="customerName">
-          <el-input v-model="customerForm.customerName"></el-input>
+          <el-input v-model="customerForm.customerName">
+            <template #prefix>
+              <el-icon><User /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item label="联系方式" prop="contactInfo">
-          <el-input v-model="customerForm.contactInfo"></el-input>
+          <el-input v-model="customerForm.contactInfo">
+            <template #prefix>
+              <el-icon><Phone /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item label="地址" prop="address">
           <el-input
             type="textarea"
             v-model="customerForm.address"
-          ></el-input>
+            :rows="3"
+          >
+          </el-input>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -87,7 +123,8 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Search, Plus, Edit, Delete, User, Phone, Location } from '@element-plus/icons-vue';
 import {
   getCustomers,
   addCustomer,
@@ -148,14 +185,28 @@ const handleEdit = (row) => {
   dialogVisible.value = true;
 };
 
-// 删除用户
+// 删除用户 - 使用MessageBox确认
 const handleDelete = async (id) => {
   try {
+    await ElMessageBox.confirm(
+      '此操作将永久删除该用户，是否继续？',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
     await deleteCustomer(id);
     ElMessage.success('用户删除成功！');
     fetchCustomers(); // 刷新列表
   } catch (error) {
-    ElMessage.error('用户删除失败: ' + (error.message || '未知错误'));
+    if (error === 'cancel') {
+      ElMessage.info('已取消删除');
+    } else {
+      ElMessage.error('用户删除失败: ' + (error.message || '未知错误'));
+    }
   }
 };
 
@@ -211,10 +262,15 @@ onMounted(() => {
   padding: 20px;
 }
 
-.search-area {
+.card-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+}
+
+.card-header h2 {
+  margin: 0;
+  color: #303133;
 }
 
 .dialog-footer button:first-child {

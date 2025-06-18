@@ -1,61 +1,68 @@
 <template>
   <div class="product-management-page">
-    <h1>商品管理</h1>
-
     <el-card class="box-card">
+      <template #header>
+        <div class="card-header">
+          <h2>商品管理</h2>
+        </div>
+      </template>
+
       <div class="search-area">
         <el-input
           v-model="searchQuery"
           placeholder="输入商品名称搜索"
           clearable
-          style="width: 300px; margin-right: 10px;"
+          style="width: 300px;"
           @clear="fetchProducts"
           @keyup.enter="fetchProducts"
-        ></el-input>
-        <el-button type="primary" @click="fetchProducts">搜索</el-button>
-        <el-button type="success" @click="handleAdd">新增商品</el-button>
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" @click="fetchProducts" :icon="Search">搜索</el-button>
+        <el-button type="success" @click="handleAdd" :icon="Plus">新增商品</el-button>
       </div>
 
       <el-table
         :data="products"
         v-loading="loading"
-        style="width: 100%; margin-top: 20px;"
+        style="width: 100%;"
         border
+        stripe
       >
         <el-table-column prop="productId" label="商品ID" width="180"></el-table-column>
         <el-table-column prop="productName" label="商品名称" width="180"></el-table-column>
-        <el-table-column prop="price" label="价格" width="120"></el-table-column>
-        <el-table-column prop="description" label="描述"></el-table-column>
-        <el-table-column prop="stock" label="库存" width="120"></el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column prop="price" label="价格" width="120" align="right">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-popconfirm
-              title="确定删除此商品吗?"
-              confirm-button-text="确定"
-              cancel-button-text="取消"
-              @confirm="handleDelete(scope.row.productId)"
-            >
-              <template #reference>
-                <el-button size="small" type="danger">删除</el-button>
-              </template>
-            </el-popconfirm>
+            <span style="color: #f56c6c; font-weight: bold;">
+              ¥{{ formatCurrency(scope.row.price) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="description" label="描述" show-overflow-tooltip></el-table-column>
+        <el-table-column prop="stock" label="库存" width="120" align="center">
+          <template #default="scope">
+            <el-tag :type="getStockType(scope.row.stock)" size="small">
+              {{ scope.row.stock }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180" align="center">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)" :icon="Edit">编辑</el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="handleDelete(scope.row.productId)"
+              :icon="Delete"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页占位符 -->
       <div class="pagination-placeholder" style="margin-top: 20px; text-align: center;">
-        <!-- <el-pagination
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-          :current-page="currentPage"
-          :page-sizes="[10, 20, 50, 100]"
-          :page-size="pageSize"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-        >
-        </el-pagination> -->
         <el-text class="mx-1" type="info">注：后端API未提供分页，此处为分页组件占位符。</el-text>
       </div>
     </el-card>
@@ -89,6 +96,7 @@
           <el-input
             type="textarea"
             v-model="productForm.description"
+            :rows="3"
           ></el-input>
         </el-form-item>
         <el-form-item label="库存" prop="stock">
@@ -113,6 +121,7 @@
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { Search, Plus, Edit, Delete } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const products = ref([]);
@@ -141,6 +150,18 @@ const rules = reactive({
   ],
   stock: [{ required: true, message: '请输入库存数量', trigger: 'blur' }],
 });
+
+// 格式化价格
+const formatCurrency = (amount) => {
+  return Number(amount).toFixed(2);
+};
+
+// 获取库存状态类型
+const getStockType = (stock) => {
+  if (stock === 0) return 'danger';
+  if (stock <= 10) return 'warning'; 
+  return 'success';
+};
 
 // 获取商品列表
 const fetchProducts = async () => {
@@ -174,9 +195,19 @@ const handleEdit = (row) => {
   dialogVisible.value = true;
 };
 
-// 删除商品
+// 删除商品 - 使用MessageBox确认
 const handleDelete = async (id) => {
   try {
+    await ElMessageBox.confirm(
+      '此操作将永久删除该商品，是否继续？',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
     await request({
       url: `/products/${id}`,
       method: 'delete'
@@ -184,7 +215,11 @@ const handleDelete = async (id) => {
     ElMessage.success('商品删除成功！');
     fetchProducts(); // 刷新列表
   } catch (error) {
-    ElMessage.error('商品删除失败: ' + (error.message || '未知错误'));
+    if (error === 'cancel') {
+      ElMessage.info('已取消删除');
+    } else {
+      ElMessage.error('商品删除失败: ' + (error.message || '未知错误'));
+    }
   }
 };
 
@@ -249,10 +284,15 @@ onMounted(() => {
   padding: 20px;
 }
 
-.search-area {
+.card-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+}
+
+.card-header h2 {
+  margin: 0;
+  color: #303133;
 }
 
 .dialog-footer button:first-child {

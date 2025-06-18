@@ -1,58 +1,87 @@
 <template>
   <div class="coupon-management-page">
-    <h1>优惠券管理</h1>
-
     <el-card class="box-card">
+      <template #header>
+        <div class="card-header">
+          <h2>优惠券管理</h2>
+        </div>
+      </template>
+
       <div class="search-area">
         <el-input
           v-model="searchQuery.userId"
           placeholder="输入用户ID搜索"
           clearable
-          style="width: 200px; margin-right: 10px;"
+          style="width: 200px;"
           @clear="fetchCoupons"
           @keyup.enter="fetchCoupons"
-        ></el-input>
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         <el-input
           v-model="searchQuery.couponCode"
           placeholder="输入优惠券码搜索"
           clearable
-          style="width: 200px; margin-right: 10px;"
+          style="width: 200px;"
           @clear="fetchCoupons"
           @keyup.enter="fetchCoupons"
-        ></el-input>
-        <el-button type="primary" @click="fetchCoupons">搜索</el-button>
-        <el-button type="success" @click="handleAdd">新增优惠券</el-button>
+        >
+          <template #prefix>
+            <el-icon><Ticket /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" @click="fetchCoupons" :icon="Search">搜索</el-button>
+        <el-button type="success" @click="handleAdd" :icon="Plus">新增优惠券</el-button>
       </div>
 
       <el-table
         :data="coupons"
         v-loading="loading"
-        style="width: 100%; margin-top: 20px;"
+        style="width: 100%;"
         border
+        stripe
       >
         <el-table-column prop="couponId" label="优惠券ID" width="180"></el-table-column>
-        <el-table-column prop="couponName" label="优惠券名称"></el-table-column>
-        <el-table-column prop="couponCode" label="优惠券码" width="150"></el-table-column>
-        <el-table-column prop="discountAmount" label="折扣金额" width="120"></el-table-column>
-        <el-table-column prop="expiryDate" label="有效期至" width="180">
+        <el-table-column prop="couponName" label="优惠券名称" width="200" show-overflow-tooltip></el-table-column>
+        <el-table-column prop="couponCode" label="优惠券码" width="150">
           <template #default="scope">
-            {{ formatDate(scope.row.expiryDate) }}
+            <el-tag type="info" size="small">{{ scope.row.couponCode }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="userId" label="用户ID" width="180"></el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column prop="discountAmount" label="折扣金额" width="120" align="right">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-popconfirm
-              title="确定删除此优惠券吗?"
-              confirm-button-text="确定"
-              cancel-button-text="取消"
-              @confirm="handleDelete(scope.row.couponId)"
-            >
-              <template #reference>
-                <el-button size="small" type="danger">删除</el-button>
-              </template>
-            </el-popconfirm>
+            <span style="color: #f56c6c; font-weight: bold;">
+              ¥{{ formatCurrency(scope.row.discountAmount) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="expiryDate" label="有效期至" width="180">
+          <template #default="scope">
+            <div style="display: flex; align-items: center;">
+              <el-icon style="margin-right: 8px; color: #e6a23c;"><Calendar /></el-icon>
+              <span :style="{ color: isExpired(scope.row.expiryDate) ? '#f56c6c' : '#606266' }">
+                {{ formatDate(scope.row.expiryDate) }}
+              </span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="userId" label="用户ID" width="180">
+          <template #default="scope">
+            <span v-if="scope.row.userId">{{ scope.row.userId }}</span>
+            <el-tag v-else type="success" size="small">通用</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180" align="center">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)" :icon="Edit">编辑</el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="handleDelete(scope.row.couponId)"
+              :icon="Delete"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -77,10 +106,18 @@
         label-width="100px"
       >
         <el-form-item label="优惠券名称" prop="couponName">
-          <el-input v-model="couponForm.couponName"></el-input>
+          <el-input v-model="couponForm.couponName">
+            <template #prefix>
+              <el-icon><Present /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item label="优惠券码" prop="couponCode">
-          <el-input v-model="couponForm.couponCode"></el-input>
+          <el-input v-model="couponForm.couponCode">
+            <template #prefix>
+              <el-icon><Ticket /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item label="折扣金额" prop="discountAmount">
           <el-input-number
@@ -101,7 +138,11 @@
           ></el-date-picker>
         </el-form-item>
         <el-form-item label="用户ID" prop="userId">
-          <el-input v-model="couponForm.userId" placeholder="留空表示通用优惠券"></el-input>
+          <el-input v-model="couponForm.userId" placeholder="留空表示通用优惠券">
+            <template #prefix>
+              <el-icon><User /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -116,7 +157,8 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Search, Plus, Edit, Delete, Present, Ticket, Calendar, User } from '@element-plus/icons-vue';
 import {
   getCoupons,
   addCoupon,
@@ -156,11 +198,29 @@ const rules = reactive({
   ],
 });
 
+// 格式化价格
+const formatCurrency = (amount) => {
+  return Number(amount).toFixed(2);
+};
+
 // 格式化日期
 const formatDate = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
-  return date.toLocaleDateString(); // 或根据需要格式化
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+};
+
+// 检查是否过期
+const isExpired = (dateString) => {
+  if (!dateString) return false;
+  const expiryDate = new Date(dateString);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return expiryDate < today;
 };
 
 // 获取优惠券列表
@@ -195,25 +255,32 @@ const handleEdit = (row) => {
   formTitle.value = '修改优惠券';
   // 复制对象属性，确保响应式更新
   const tempRow = { ...row };
-  // 如果 expiryDate 是字符串，ElDatePicker 需要 Date 对象或符合其value-format的字符串
-  // 确保它能被正确识别，这里如果后端返回的是类似 'YYYY-MM-DD'，直接赋值即可
-  // 如果是 ISO 8601，可能需要 new Date() 转换
-  if (tempRow.expiryDate && typeof tempRow.expiryDate === 'string') {
-      // 对于 YYYY-MM-DD 格式的日期字符串，直接赋值即可，ElDatePicker 会处理
-      // 如果是更复杂的日期时间，可能需要 new Date(tempRow.expiryDate)
-  }
   Object.assign(couponForm, tempRow);
   dialogVisible.value = true;
 };
 
-// 删除优惠券
+// 删除优惠券 - 使用MessageBox确认
 const handleDelete = async (id) => {
   try {
+    await ElMessageBox.confirm(
+      '此操作将永久删除该优惠券，是否继续？',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
     await deleteCoupon(id);
     ElMessage.success('优惠券删除成功！');
     fetchCoupons(); // 刷新列表
   } catch (error) {
-    ElMessage.error('优惠券删除失败: ' + (error.message || '未知错误'));
+    if (error === 'cancel') {
+      ElMessage.info('已取消删除');
+    } else {
+      ElMessage.error('优惠券删除失败: ' + (error.message || '未知错误'));
+    }
   }
 };
 
@@ -222,19 +289,13 @@ const submitForm = () => {
   couponFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        // 确保 userId 如果为空字符串则为 null
-        const submitData = { ...couponForm };
-        if (submitData.userId === '') {
-            submitData.userId = null;
-        }
-
         if (couponForm.couponId) {
           // 编辑
-          await updateCoupon(couponForm.couponId, submitData);
+          await updateCoupon(couponForm.couponId, couponForm);
           ElMessage.success('优惠券信息修改成功！');
         } else {
           // 新增
-          await addCoupon(submitData);
+          await addCoupon(couponForm);
           ElMessage.success('优惠券新增成功！');
         }
         dialogVisible.value = false;
@@ -263,7 +324,7 @@ const resetForm = () => {
   couponForm.couponCode = '';
   couponForm.discountAmount = 0;
   couponForm.expiryDate = '';
-  couponForm.userId = null; // 重置为 null
+  couponForm.userId = null;
   dialogVisible.value = false;
 };
 
@@ -277,10 +338,15 @@ onMounted(() => {
   padding: 20px;
 }
 
-.search-area {
+.card-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+}
+
+.card-header h2 {
+  margin: 0;
+  color: #303133;
 }
 
 .dialog-footer button:first-child {

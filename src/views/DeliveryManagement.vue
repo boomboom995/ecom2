@@ -1,22 +1,30 @@
 <template>
   <div class="delivery-management-page">
-    <h1>配送管理</h1>
-
     <el-card class="box-card">
+      <template #header>
+        <div class="card-header">
+          <h2>配送管理</h2>
+        </div>
+      </template>
+
       <div class="search-area">
         <el-input
           v-model="searchQuery.orderId"
           placeholder="输入订单ID搜索"
           clearable
-          style="width: 200px; margin-right: 10px;"
+          style="width: 200px;"
           @clear="fetchDeliveries"
           @keyup.enter="fetchDeliveries"
-        ></el-input>
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         <el-select
           v-model="searchQuery.status"
           placeholder="选择配送状态"
           clearable
-          style="width: 150px; margin-right: 10px;"
+          style="width: 150px;"
           @clear="fetchDeliveries"
         >
           <el-option label="待发货" value="待发货"></el-option>
@@ -24,38 +32,51 @@
           <el-option label="已送达" value="已送达"></el-option>
           <el-option label="已取消" value="已取消"></el-option>
         </el-select>
-        <el-button type="primary" @click="fetchDeliveries">搜索</el-button>
-        <el-button type="success" @click="handleAdd">新增配送</el-button>
+        <el-button type="primary" @click="fetchDeliveries" :icon="Search">搜索</el-button>
+        <el-button type="success" @click="handleAdd" :icon="Plus">新增配送</el-button>
       </div>
 
       <el-table
         :data="deliveries"
         v-loading="loading"
-        style="width: 100%; margin-top: 20px;"
+        style="width: 100%;"
         border
+        stripe
       >
         <el-table-column prop="deliveryId" label="配送ID" width="180"></el-table-column>
         <el-table-column prop="orderId" label="订单ID" width="180"></el-table-column>
-        <el-table-column prop="deliveryStatus" label="配送状态" width="120"></el-table-column>
-        <el-table-column prop="deliverer" label="配送员"></el-table-column>
-        <el-table-column prop="deliveryTime" label="配送时间" width="180">
+        <el-table-column prop="deliveryStatus" label="配送状态" width="120" align="center">
           <template #default="scope">
-            {{ formatDate(scope.row.deliveryTime) }}
+            <el-tag :type="getDeliveryStatusType(scope.row.deliveryStatus)" size="small">
+              {{ scope.row.deliveryStatus }}
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column prop="deliverer" label="配送员">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-popconfirm
-              title="确定删除此配送吗?"
-              confirm-button-text="确定"
-              cancel-button-text="取消"
-              @confirm="handleDelete(scope.row.deliveryId)"
-            >
-              <template #reference>
-                <el-button size="small" type="danger">删除</el-button>
-              </template>
-            </el-popconfirm>
+            <div style="display: flex; align-items: center;">
+              <el-icon style="margin-right: 8px; color: #409eff;"><User /></el-icon>
+              {{ scope.row.deliverer }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="deliveryTime" label="配送时间" width="180">
+          <template #default="scope">
+            <div style="display: flex; align-items: center;">
+              <el-icon style="margin-right: 8px; color: #67c23a;"><Clock /></el-icon>
+              {{ formatDate(scope.row.deliveryTime) }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180" align="center">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)" :icon="Edit">编辑</el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="handleDelete(scope.row.deliveryId)"
+              :icon="Delete"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -107,7 +128,11 @@
           </el-select>
         </el-form-item>
         <el-form-item label="配送员" prop="deliverer">
-          <el-input v-model="deliveryForm.deliverer"></el-input>
+          <el-input v-model="deliveryForm.deliverer">
+            <template #prefix>
+              <el-icon><User /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item label="配送时间" prop="deliveryTime">
           <el-date-picker
@@ -131,7 +156,8 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Search, Plus, Edit, Delete, User, Clock } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const deliveries = ref([]);
@@ -162,11 +188,28 @@ const rules = reactive({
   deliveryTime: [{ required: true, message: '请选择配送时间', trigger: 'change' }],
 });
 
+// 获取配送状态类型
+const getDeliveryStatusType = (status) => {
+  const statusMap = {
+    '待发货': 'warning',
+    '运输中': 'primary',
+    '已送达': 'success',
+    '已取消': 'danger'
+  };
+  return statusMap[status] || '';
+};
+
 // 格式化日期时间
 const formatDate = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
-  return date.toLocaleString(); // 或根据需要格式化
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 };
 
 // 获取订单列表
@@ -208,8 +251,7 @@ const fetchDeliveries = async () => {
 
 // 新增配送
 const handleAdd = async () => {
-  // 确保在打开对话框前获取最新的订单列表
-  await fetchOrders();
+  await fetchOrders(); // 确保在打开对话框前获取最新的订单列表
   resetForm();
   formTitle.value = '新增配送';
   dialogVisible.value = true;
@@ -218,18 +260,23 @@ const handleAdd = async () => {
 // 编辑配送
 const handleEdit = (row) => {
   formTitle.value = '修改配送';
-  // 注意：后端返回的 ISO 8601 字符串可能需要转换为 Date 对象才能被 el-date-picker 正常显示
-  const tempRow = { ...row };
-  if (tempRow.deliveryTime) {
-    tempRow.deliveryTime = new Date(tempRow.deliveryTime);
-  }
-  Object.assign(deliveryForm, tempRow);
+  Object.assign(deliveryForm, row);
   dialogVisible.value = true;
 };
 
-// 删除配送
+// 删除配送 - 使用MessageBox确认
 const handleDelete = async (id) => {
   try {
+    await ElMessageBox.confirm(
+      '此操作将永久删除该配送记录，是否继续？',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
     await request({
       url: `/deliveries/${id}`,
       method: 'delete'
@@ -237,7 +284,11 @@ const handleDelete = async (id) => {
     ElMessage.success('配送删除成功！');
     fetchDeliveries(); // 刷新列表
   } catch (error) {
-    ElMessage.error('配送删除失败: ' + (error.message || '未知错误'));
+    if (error === 'cancel') {
+      ElMessage.info('已取消删除');
+    } else {
+      ElMessage.error('配送删除失败: ' + (error.message || '未知错误'));
+    }
   }
 };
 
@@ -246,15 +297,13 @@ const submitForm = () => {
   deliveryFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        // 确保 deliveryTime 格式是后端需要的 ISO 8601 字符串
-        const submitData = { ...deliveryForm };
-        if (submitData.deliveryTime instanceof Date) {
-          // 如果是 Date 对象，转换为 ISO 8601 字符串
-          submitData.deliveryTime = submitData.deliveryTime.toISOString();
-        } else if (typeof submitData.deliveryTime === 'string' && submitData.deliveryTime.length > 0 && !submitData.deliveryTime.endsWith('Z')) {
-          // 如果是日期字符串但没有时区信息，假设为本地时间并转换为 ISO 8601 UTC
-          submitData.deliveryTime = new Date(submitData.deliveryTime).toISOString();
-        }
+        // 创建提交数据对象，移除deliveryId字段
+        const submitData = {
+          orderId: deliveryForm.orderId,
+          deliveryStatus: deliveryForm.deliveryStatus,
+          deliverer: deliveryForm.deliverer,
+          deliveryTime: deliveryForm.deliveryTime
+        };
 
         if (deliveryForm.deliveryId) {
           // 编辑
@@ -304,6 +353,7 @@ const resetForm = () => {
 
 onMounted(() => {
   fetchDeliveries();
+  fetchOrders();
 });
 </script>
 
@@ -312,10 +362,15 @@ onMounted(() => {
   padding: 20px;
 }
 
-.search-area {
+.card-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+}
+
+.card-header h2 {
+  margin: 0;
+  color: #303133;
 }
 
 .dialog-footer button:first-child {
