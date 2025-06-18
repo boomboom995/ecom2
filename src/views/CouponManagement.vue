@@ -1,0 +1,289 @@
+<template>
+  <div class="coupon-management-page">
+    <h1>优惠券管理</h1>
+
+    <el-card class="box-card">
+      <div class="search-area">
+        <el-input
+          v-model="searchQuery.userId"
+          placeholder="输入用户ID搜索"
+          clearable
+          style="width: 200px; margin-right: 10px;"
+          @clear="fetchCoupons"
+          @keyup.enter="fetchCoupons"
+        ></el-input>
+        <el-input
+          v-model="searchQuery.couponCode"
+          placeholder="输入优惠券码搜索"
+          clearable
+          style="width: 200px; margin-right: 10px;"
+          @clear="fetchCoupons"
+          @keyup.enter="fetchCoupons"
+        ></el-input>
+        <el-button type="primary" @click="fetchCoupons">搜索</el-button>
+        <el-button type="success" @click="handleAdd">新增优惠券</el-button>
+      </div>
+
+      <el-table
+        :data="coupons"
+        v-loading="loading"
+        style="width: 100%; margin-top: 20px;"
+        border
+      >
+        <el-table-column prop="couponId" label="优惠券ID" width="180"></el-table-column>
+        <el-table-column prop="couponName" label="优惠券名称"></el-table-column>
+        <el-table-column prop="couponCode" label="优惠券码" width="150"></el-table-column>
+        <el-table-column prop="discountAmount" label="折扣金额" width="120"></el-table-column>
+        <el-table-column prop="expiryDate" label="有效期至" width="180">
+          <template #default="scope">
+            {{ formatDate(scope.row.expiryDate) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="userId" label="用户ID" width="180"></el-table-column>
+        <el-table-column label="操作" width="180">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-popconfirm
+              title="确定删除此优惠券吗?"
+              confirm-button-text="确定"
+              cancel-button-text="取消"
+              @confirm="handleDelete(scope.row.couponId)"
+            >
+              <template #reference>
+                <el-button size="small" type="danger">删除</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 分页占位符 -->
+      <div class="pagination-placeholder" style="margin-top: 20px; text-align: center;">
+        <el-text class="mx-1" type="info">注：后端API未提供分页，此处为分页组件占位符。</el-text>
+      </div>
+    </el-card>
+
+    <!-- 新增/编辑优惠券对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="formTitle"
+      width="500px"
+      :before-close="resetForm"
+    >
+      <el-form
+        :model="couponForm"
+        :rules="rules"
+        ref="couponFormRef"
+        label-width="100px"
+      >
+        <el-form-item label="优惠券名称" prop="couponName">
+          <el-input v-model="couponForm.couponName"></el-input>
+        </el-form-item>
+        <el-form-item label="优惠券码" prop="couponCode">
+          <el-input v-model="couponForm.couponCode"></el-input>
+        </el-form-item>
+        <el-form-item label="折扣金额" prop="discountAmount">
+          <el-input-number
+            v-model="couponForm.discountAmount"
+            :precision="2"
+            :step="0.1"
+            :min="0"
+            style="width: 100%;"
+          ></el-input-number>
+        </el-form-item>
+        <el-form-item label="有效期至" prop="expiryDate">
+          <el-date-picker
+            v-model="couponForm.expiryDate"
+            type="date"
+            placeholder="选择有效期"
+            value-format="YYYY-MM-DD"
+            style="width: 100%;"
+          ></el-date-picker>
+        </el-form-item>
+        <el-form-item label="用户ID" prop="userId">
+          <el-input v-model="couponForm.userId" placeholder="留空表示通用优惠券"></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="resetForm">取消</el-button>
+          <el-button type="primary" @click="submitForm">提交</el-button>
+        </span>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, reactive } from 'vue';
+import { ElMessage } from 'element-plus';
+import {
+  getCoupons,
+  addCoupon,
+  updateCoupon,
+  deleteCoupon,
+} from '@/api/coupon';
+
+const coupons = ref([]);
+const loading = ref(true);
+const searchQuery = reactive({ userId: '', couponCode: '' });
+
+const dialogVisible = ref(false);
+const formTitle = ref('');
+const couponFormRef = ref(null); // 表单引用
+
+const couponForm = reactive({
+  couponId: null,
+  couponName: '',
+  couponCode: '',
+  discountAmount: 0,
+  expiryDate: '',
+  userId: null, // null 表示通用优惠券
+});
+
+const rules = reactive({
+  couponName: [
+    { required: true, message: '请输入优惠券名称', trigger: 'blur' },
+  ],
+  couponCode: [
+    { required: true, message: '请输入优惠券码', trigger: 'blur' },
+  ],
+  discountAmount: [
+    { required: true, message: '请输入折扣金额', trigger: 'blur' },
+  ],
+  expiryDate: [
+    { required: true, message: '请选择有效期', trigger: 'change' },
+  ],
+});
+
+// 格式化日期
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString(); // 或根据需要格式化
+};
+
+// 获取优惠券列表
+const fetchCoupons = async () => {
+  loading.value = true;
+  try {
+    const params = {};
+    if (searchQuery.userId) {
+      params.userId = searchQuery.userId;
+    }
+    if (searchQuery.couponCode) {
+      params.couponCode = searchQuery.couponCode;
+    }
+    const data = await getCoupons(params);
+    coupons.value = data;
+  } catch (error) {
+    ElMessage.error('获取优惠券列表失败: ' + (error.message || '未知错误'));
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 新增优惠券
+const handleAdd = () => {
+  resetForm();
+  formTitle.value = '新增优惠券';
+  dialogVisible.value = true;
+};
+
+// 编辑优惠券
+const handleEdit = (row) => {
+  formTitle.value = '修改优惠券';
+  // 复制对象属性，确保响应式更新
+  const tempRow = { ...row };
+  // 如果 expiryDate 是字符串，ElDatePicker 需要 Date 对象或符合其value-format的字符串
+  // 确保它能被正确识别，这里如果后端返回的是类似 'YYYY-MM-DD'，直接赋值即可
+  // 如果是 ISO 8601，可能需要 new Date() 转换
+  if (tempRow.expiryDate && typeof tempRow.expiryDate === 'string') {
+      // 对于 YYYY-MM-DD 格式的日期字符串，直接赋值即可，ElDatePicker 会处理
+      // 如果是更复杂的日期时间，可能需要 new Date(tempRow.expiryDate)
+  }
+  Object.assign(couponForm, tempRow);
+  dialogVisible.value = true;
+};
+
+// 删除优惠券
+const handleDelete = async (id) => {
+  try {
+    await deleteCoupon(id);
+    ElMessage.success('优惠券删除成功！');
+    fetchCoupons(); // 刷新列表
+  } catch (error) {
+    ElMessage.error('优惠券删除失败: ' + (error.message || '未知错误'));
+  }
+};
+
+// 提交表单（新增/编辑）
+const submitForm = () => {
+  couponFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        // 确保 userId 如果为空字符串则为 null
+        const submitData = { ...couponForm };
+        if (submitData.userId === '') {
+            submitData.userId = null;
+        }
+
+        if (couponForm.couponId) {
+          // 编辑
+          await updateCoupon(couponForm.couponId, submitData);
+          ElMessage.success('优惠券信息修改成功！');
+        } else {
+          // 新增
+          await addCoupon(submitData);
+          ElMessage.success('优惠券新增成功！');
+        }
+        dialogVisible.value = false;
+        fetchCoupons(); // 刷新列表
+      } catch (error) {
+        ElMessage.error(
+          (couponForm.couponId ? '修改' : '新增') +
+            '优惠券失败: ' +
+            (error.message || '未知错误')
+        );
+      }
+    } else {
+      console.log('表单验证失败');
+      return false;
+    }
+  });
+};
+
+// 重置表单
+const resetForm = () => {
+  if (couponFormRef.value) {
+    couponFormRef.value.resetFields();
+  }
+  couponForm.couponId = null;
+  couponForm.couponName = '';
+  couponForm.couponCode = '';
+  couponForm.discountAmount = 0;
+  couponForm.expiryDate = '';
+  couponForm.userId = null; // 重置为 null
+  dialogVisible.value = false;
+};
+
+onMounted(() => {
+  fetchCoupons();
+});
+</script>
+
+<style scoped>
+.coupon-management-page {
+  padding: 20px;
+}
+
+.search-area {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.dialog-footer button:first-child {
+  margin-right: 10px;
+}
+</style> 
